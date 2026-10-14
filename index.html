@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bé xây dựng tháp dinh dưỡng</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#fff7e8;font-family:"Trebuchet MS",Arial,sans-serif;color:#18356b}
+.top{max-width:1500px;margin:auto;padding:10px 14px 18px}
+h1{text-align:center;color:#d71920;font-size:clamp(22px,3vw,38px);margin:4px 0}
+.sub{text-align:center;font-size:clamp(14px,1.8vw,22px);font-weight:800;margin:0 0 10px}
+.toolbar{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:8px 0 12px}
+button{border:0;border-radius:999px;padding:10px 18px;font-size:16px;font-weight:bold;background:#168b46;color:white;cursor:pointer;box-shadow:0 3px 0 #0c6530}
+button.secondary{background:#287bc1;box-shadow:0 3px 0 #18548a}
+#board{position:relative;width:min(100%,1491px);aspect-ratio:1491/1055;margin:auto;background-image: url('images/nen-goc.jpg');background-size:100% 100%;overflow:hidden;border-radius:8px;touch-action:pan-y}
+#board .food-cover{
+  position:absolute;
+  left:58%;
+  top:18.8%;
+  width:39.4%;
+  height:71.5%;
+  background:#fffdf5;
+  border-radius:10px;
+  z-index:1;
+}
+.food-bank{
+  position:absolute;
+  left:58%;
+  top:18.8%;
+  width:39.4%;
+  height:71.5%;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-rows:repeat(4,minmax(0,1fr));
+  gap:1.1%;
+  z-index:4;
+  padding:0.3%;
+}
+.food{width:100%;height:100%;object-fit:contain;cursor:grab;user-select:none;touch-action:none;filter:drop-shadow(0 1px 1px #888);transition:transform .12s}
+.food:active{cursor:grabbing;transform:scale(1.04)}
+.food.used{visibility:hidden;pointer-events:none}
+.zone{position:absolute;z-index:2;display:flex;align-items:flex-end;justify-content:center;padding:1%;border:2px dashed transparent;border-radius:12px;transition:background .15s,border-color .15s}
+.zone.over{background:#ffffff66;border-color:#169b51}
+.zone .placed{position:absolute;inset:16% 4% 5%;display:flex;flex-wrap:wrap;align-content:center;align-items:center;justify-content:center;gap:1%;pointer-events:none}
+.zone .placed img{width:30%;height:44%;object-fit:contain;filter:drop-shadow(0 1px 1px #aaa)}
+/* Drop zones align to the four original colored tiers of the pyramid. */
+#fat{left:21.0%;top:19.5%;width:18.1%;height:19.8%}
+#protein{left:14.0%;top:38.5%;width:32.2%;height:18.2%}
+#vit{left:7.0%;top:56.5%;width:46.5%;height:17.7%}
+#carb{left:1.5%;top:73.4%;width:56.5%;height:17.3%}
+#feedback{position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;font-size:clamp(70px,12vw,170px);font-weight:900;text-shadow:0 5px 0 #ffffff,0 8px 18px #5558;pointer-events:none}
+#feedback.good{color:#16a34a}#feedback.bad{color:#e32636}
+#confetti{position:absolute;inset:0;z-index:9;pointer-events:none;overflow:hidden}
+.flower{position:absolute;animation:pop 1s ease-out forwards;font-size:clamp(22px,4vw,50px)}
+@keyframes pop{0%{transform:scale(.2) rotate(0);opacity:0}25%{opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1.25) rotate(160deg);opacity:0}}
+#win{position:absolute;z-index:11;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;background:#fff9e9b8;color:#d71920;font-size:clamp(25px,4.2vw,58px);font-weight:900;text-shadow:0 2px white;padding:15px}
+#win small{font-size:clamp(16px,2.2vw,28px);color:#17427b;margin-top:8px}
+.hint{text-align:center;color:#345;font-size:14px;margin:10px 0}
+@media(max-width:650px){.top{padding:6px}button{font-size:13px;padding:8px 12px}.hint{font-size:12px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>BÉ XÂY DỰNG THÁP DINH DƯỠNG</h1>
+  <p class="sub">Bé hãy kéo thực phẩm vào đúng nhóm chất nhé!</p>
+  <div class="toolbar">
+    <button onclick="resetGame()">🔄 Chơi lại</button>
+    <button class="secondary" onclick="sayHint()">💡 Gợi ý cho bé</button>
+  </div>
+  <div id="board" aria-label="Trò chơi kéo thả thực phẩm vào tháp dinh dưỡng">
+    <div class="food-cover"></div>
+    <div class="zone" id="fat" data-group="fat" aria-label="Chất béo"><div class="placed"></div></div>
+    <div class="zone" id="protein" data-group="protein" aria-label="Chất đạm"><div class="placed"></div></div>
+    <div class="zone" id="vit" data-group="vit" aria-label="Vitamin và khoáng chất"><div class="placed"></div></div>
+    <div class="zone" id="carb" data-group="carb" aria-label="Bột đường"><div class="placed"></div></div>
+    <div class="food-bank" id="bank"></div>
+    <div id="confetti"></div><div id="feedback"></div>
+    <div id="win">🎉 BÉ GIỎI QUÁ! 🎉<small>Bé đã xếp đúng tất cả thực phẩm!</small><div style="font-size:48px">🌸 🎆 🌟 🎆 🌸</div></div>
+  </div>
+  <p class="hint">Kéo từng thẻ thực phẩm vào tầng tháp phù hợp. Nếu chưa đúng, bé hãy thử lại nhé!</p>
+</div>
+<script>
+const items=[
+ {id:'dau-an',label:'Dầu ăn',group:'fat'},{id:'bo',label:'Bơ',group:'fat'},{id:'mo-heo',label:'Mỡ heo',group:'fat'},
+ {id:'trung',label:'Trứng',group:'protein'},{id:'thit-heo',label:'Thịt heo',group:'protein'},{id:'ca',label:'Cá',group:'protein'},
+ {id:'bong-cai',label:'Bông cải',group:'vit'},{id:'ca-rot',label:'Cà rốt',group:'vit'},{id:'qua-cam',label:'Quả cam',group:'vit'},
+ {id:'com',label:'Cơm',group:'carb'},{id:'banh-mi',label:'Bánh mì',group:'carb'},{id:'khoai-lang',label:'Khoai lang',group:'carb'}
+];
+const bank=document.getElementById('bank'), board=document.getElementById('board');
+let placed=new Set(), drag=null, startX=0,startY=0, feedbackTimer;
+function imgPath(id) {
+    return 'images/' + id + '.png';
+}
+function makeFood(item){
+ const img=document.createElement('img'); img.className='food';img.src=imgPath(item.id);img.alt=item.label;img.draggable=false;img.dataset.id=item.id;
+ img.addEventListener('pointerdown',e=>beginDrag(e,img,item));return img;
+}
+function init(){
+bank.innerHTML='';
+
+// Sao chép danh sách thực phẩm và xáo trộn ngẫu nhiên
+const shuffledItems = [...items];
+
+for(let i = shuffledItems.length - 1; i > 0; i--){
+const j = Math.floor(Math.random() * (i + 1));
+[shuffledItems[i], shuffledItems[j]] =
+[shuffledItems[j], shuffledItems[i]];
+}
+
+// Đưa các thực phẩm vào khay theo thứ tự mới
+shuffledItems.forEach(i => bank.appendChild(makeFood(i)));
+
+document.querySelectorAll('.placed').forEach(p => p.innerHTML='');
+placed.clear();
+document.getElementById('win').style.display='none';
+document.getElementById('confetti').innerHTML='';
+hideFeedback();
+}
+function beginDrag(e,img,item){
+ if(placed.has(item.id))return;e.preventDefault();
+ const rect=img.getBoundingClientRect(), br=board.getBoundingClientRect();
+ drag={item,img,ghost:img.cloneNode(true),offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top,boardRect:br};
+ drag.ghost.style.cssText=`position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;z-index:30;opacity:.94;pointer-events:none;filter:drop-shadow(0 5px 5px #5558)`;
+ document.body.appendChild(drag.ghost);img.style.opacity='.25';
+ img.setPointerCapture?.(e.pointerId);
+ window.addEventListener('pointermove',moveDrag);window.addEventListener('pointerup',endDrag,{once:true});
+}
+function moveDrag(e){if(!drag)return;drag.ghost.style.left=(e.clientX-drag.offsetX)+'px';drag.ghost.style.top=(e.clientY-drag.offsetY)+'px';document.querySelectorAll('.zone').forEach(z=>{let r=z.getBoundingClientRect();z.classList.toggle('over',e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom)})}
+function endDrag(e){
+ if(!drag)return;window.removeEventListener('pointermove',moveDrag);
+ const z=[...document.querySelectorAll('.zone')].find(z=>{let r=z.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom});
+ document.querySelectorAll('.zone').forEach(x=>x.classList.remove('over'));
+ const d=drag;d.ghost.remove();d.img.style.opacity='';drag=null;
+ if(z&&z.dataset.group===d.item.group){placed.add(d.item.id);d.img.classList.add('used');const copy=document.createElement('img');copy.src=imgPath(d.item.id);copy.alt=d.item.label;z.querySelector('.placed').appendChild(copy);showFeedback(true);flowers(e.clientX,e.clientY);if(placed.size===items.length)setTimeout(winGame,850)}
+ else if(z){showFeedback(false)}
+}
+function showFeedback(ok){const f=document.getElementById('feedback');clearTimeout(feedbackTimer);f.textContent=ok?'✓':'✕';f.className=ok?'good':'bad';f.style.display='flex';feedbackTimer=setTimeout(()=>{f.style.display='none'},1000)}
+function hideFeedback(){document.getElementById('feedback').style.display='none';clearTimeout(feedbackTimer)}
+function flowers(x,y){const c=document.getElementById('confetti'),r=board.getBoundingClientRect();['🌸','🌼','✨','🌺','⭐','🌷'].forEach((em,i)=>{let s=document.createElement('span');s.className='flower';s.textContent=em;s.style.left=(x-r.left)+'px';s.style.top=(y-r.top)+'px';s.style.setProperty('--dx',(Math.cos(i*Math.PI/3)*100)+'px');s.style.setProperty('--dy',(Math.sin(i*Math.PI/3)*90)+'px');c.appendChild(s);setTimeout(()=>s.remove(),1100)})}
+function winGame(){document.getElementById('win').style.display='flex';const c=document.getElementById('confetti');for(let i=0;i<50;i++){let s=document.createElement('span');s.className='flower';s.textContent=['🎆','✨','⭐','🎉','🌸'][i%5];s.style.left=Math.random()*95+'%';s.style.top=Math.random()*85+'%';s.style.setProperty('--dx',(Math.random()*150-75)+'px');s.style.setProperty('--dy',(Math.random()*130-65)+'px');c.appendChild(s);setTimeout(()=>s.remove(),1400)}}
+function resetGame(){init()}
+function sayHint(){alert('Bé thử nhớ nhé: dầu ăn, bơ, mỡ heo thuộc chất béo; trứng, thịt heo, cá thuộc chất đạm; bông cải, cà rốt, quả cam thuộc vitamin và khoáng chất; cơm, bánh mì, khoai lang thuộc bột đường.')}
+init();
+</script>
+</body></html>
